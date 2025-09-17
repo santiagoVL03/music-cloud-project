@@ -1,0 +1,5 @@
+# Arquivo .gitignore para o domínio api-music
+__pycache__/
+*.pyc
+.env
+.vscode/
