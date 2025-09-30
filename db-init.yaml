@@ -1,0 +1,20 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: db-init
+          image: homura69/musiccloud:latest
+          command: ["python", "init_data.py"]
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          # esperar a que postgres esté arriba
+          envFrom:
+            - secretRef:
+                name: postgres-secret
