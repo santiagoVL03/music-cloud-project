@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.9'
 
 services:
   db:
@@ -11,6 +11,12 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U santiago -d musiccloud"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
     deploy:
       resources:
         limits:
@@ -20,8 +26,24 @@ services:
           cpus: "0.25"
           memory: 256M
 
+  # One-off container that seeds the database using init_data.py (idempotent)
+  db_init:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python init_data.py
+    restart: "no"   # Run only once
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
   web:
     build: .
+    depends_on:
+      db_init:
+        condition: service_completed_successfully
     command: uvicorn main:app --host 0.0.0.0 --port 8000
     volumes:
       - .:/app
