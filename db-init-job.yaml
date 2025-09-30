@@ -1,0 +1,22 @@
+# db-init-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: db-init
+          image: santiago/musiccloud:latest 
+          command: ["python", "init_data.py"]
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+      volumes:
+        - name: app-code
+          emptyDir: {}
