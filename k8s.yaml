@@ -58,6 +58,17 @@ spec:
           env:
             - name: PYTHONUNBUFFERED
               value: "1"
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "santiago"
+            - name: DB_PASSWORD
+              value: "santiago"
+            - name: DB_NAME
+              value: "musiccloud"
+
 ---
 apiVersion: v1
 kind: Service
@@ -93,5 +104,15 @@ spec:
           env:
             - name: ENVIRONMENT
               value: "production"
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "santiago"
+            - name: DB_PASSWORD
+              value: "santiago"
+            - name: DB_NAME
+              value: "musiccloud"
           ports:
             - containerPort: 8000
