@@ -9,7 +9,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: db-init
-          image: santiago/musiccloud:latest 
+          image: homura69/musiccloud:latest
           command: ["python", "init_data.py"]
           env:
             - name: PYTHONUNBUFFERED

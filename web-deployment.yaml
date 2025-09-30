@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: web
-          image: santiago/musiccloud:latest
+          image: homura69/musiccloud:latest
           env:
             - name: ENVIRONMENT
               value: "production"
