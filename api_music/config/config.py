@@ -5,7 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # PostgreSQL connection settings
-DATABASE_URL = "postgresql://santiago:santiago@db:5432/musiccloud"
+DATABASE_URL = "postgresql://santiago:santiago@postgres:5432/musiccloud"
 
 # Create SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
