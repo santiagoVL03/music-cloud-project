@@ -8,19 +8,19 @@ spec:
     spec:
       restartPolicy: Never
       containers:
-    - name: db-init
-      image: homura69/musiccloud:latest
-      command: ["python", "init_data.py"]
-      env:
-        - name: PYTHONUNBUFFERED
-          value: "1"
-        - name: POSTGRES_USER
-          value: "santiago"
-        - name: POSTGRES_PASSWORD
-          value: "santiago"
-        - name: POSTGRES_DB
-          value: "musiccloud"
-        - name: POSTGRES_HOST
-          value: "postgres"
-        - name: POSTGRES_PORT
-          value: "5432"
+      - name: db-init
+        image: homura69/musiccloud:latest
+        command: ["python", "init_data.py"]
+        env:
+          - name: PYTHONUNBUFFERED
+            value: "1"
+          - name: POSTGRES_USER
+            value: "santiago"
+          - name: POSTGRES_PASSWORD
+            value: "santiago"
+          - name: POSTGRES_DB
+            value: "musiccloud"
+          - name: POSTGRES_HOST
+            value: "postgres"
+          - name: POSTGRES_PORT
+            value: "5432"
