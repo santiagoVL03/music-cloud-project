@@ -35,3 +35,10 @@ spec:
               value: "production"
           ports:
             - containerPort: 8000
+          resources:
+            requests:
+              cpu: 100m      # 0.1 CPU
+              memory: 128Mi  # memoria mínima reservada
+            limits:
+              cpu: 200m      # hasta 0.2 CPU
+              memory: 256Mi  # límite máximo de memoria
