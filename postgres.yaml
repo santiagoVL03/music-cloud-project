@@ -41,4 +41,5 @@ spec:
               mountPath: /var/lib/postgresql/data
       volumes:
         - name: pgdata
-          emptyDir: {}   # ⚠️ no persiste datos
+          persistentVolumeClaim:
+            claimName: postgres-pvc
