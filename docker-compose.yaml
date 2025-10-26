@@ -37,6 +37,7 @@ services:
       - .:/app
     environment:
       - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://santiago:santiago@db:5432/musiccloud
 
   web:
     build: .
