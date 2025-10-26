@@ -26,14 +26,13 @@ services:
           cpus: "0.25"
           memory: 256M
 
-  # One-off container that seeds the database using init_data.py (idempotent)
   db_init:
     build: .
     depends_on:
       db:
         condition: service_healthy
     command: python init_data.py
-    restart: "no"   # Run only once
+    restart: "no"
     volumes:
       - .:/app
     environment:
@@ -51,6 +50,7 @@ services:
       - "8000:8000"
     environment:
       - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://santiago:santiago@db:5432/musiccloud
     deploy:
       resources:
         limits:

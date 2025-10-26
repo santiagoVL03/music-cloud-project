@@ -1,11 +1,8 @@
-# Main application for music cloud project
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api_music.router.router import router as api_music_router
 from api_music.config.config import engine, Base
 
-# Create database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -14,12 +11,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ⚠️ Permite cualquier origen
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Permite todos los métodos
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
