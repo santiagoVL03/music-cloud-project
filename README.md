@@ -1,6 +1,87 @@
 # Music Cloud API
 
-A simple backend using FastAPI and SQLAlchemy for managing users and their music library with PostgreSQL database.
+A simple backend using FastAPI and SQLAlchemy for managing users and their music library with PostgreSQL database. The infrastructure is managed using OpenTofu for automatic scaling on AWS.
+
+## Infrastructure with OpenTofu
+
+This project uses **OpenTofu** (an open-source Terraform alternative) to provision and manage cloud infrastructure on AWS with automatic scaling capabilities.
+
+### OpenTofu Files Overview
+
+#### `opentofu_scaler/main.tf`
+The main infrastructure configuration file that defines:
+
+- **VPC and Networking**: Creates a Virtual Private Cloud (10.0.0.0/16) with two public subnets across different availability zones (us-east-1a and us-east-1b) for high availability
+- **Internet Gateway and Route Tables**: Enables internet access for the public subnets
+- **Security Groups**:
+  - `web_sg`: Allows HTTP (port 80), SSH (port 22), and internal VPC communication for web instances
+  - `db_sg`: Allows PostgreSQL (port 5432) from web instances, SSH access, and internal VPC traffic
+- **Database Instance**: Deploys a t3.micro EC2 instance running PostgreSQL 13 in a Docker container with the musiccloud database
+- **Launch Template**: Defines the configuration for web server instances that run the musiccloud-web Docker container, automatically connecting to the database
+- **Application Load Balancer**: Distributes incoming HTTP traffic across multiple web instances
+- **Auto Scaling Group**: Automatically scales web instances between 1 and 3 based on demand, with health checks via the load balancer
+
+#### `opentofu_scaler/variables.tf`
+Defines configurable variables for the infrastructure:
+
+- `aws_region`: The AWS region where resources will be deployed (default: us-east-1)
+
+This allows easy customization without modifying the main configuration.
+
+#### `opentofu_scaler/outputs.tf`
+Exports important information after deployment:
+
+- `load_balancer_dns`: The DNS name of the Application Load Balancer, which is the public endpoint to access your API
+
+### Deploying with OpenTofu
+
+1. **Install OpenTofu** (if not already installed):
+   ```bash
+   # On Linux
+   curl --proto '=https' --tlsv1.2 -fsSL https://get.opentofu.org/install-opentofu.sh | bash
+   ```
+
+2. **Configure AWS credentials**:
+   ```bash
+   export AWS_ACCESS_KEY_ID="your-access-key"
+   export AWS_SECRET_ACCESS_KEY="your-secret-key"
+   ```
+
+3. **Initialize OpenTofu**:
+   ```bash
+   cd opentofu_scaler
+   tofu init
+   ```
+
+4. **Plan the deployment** (review what will be created):
+   ```bash
+   tofu plan
+   ```
+
+5. **Apply the configuration**:
+   ```bash
+   tofu apply
+   ```
+   Type `yes` when prompted to confirm.
+
+6. **Access your API**:
+   After deployment, OpenTofu will output the Load Balancer DNS. Use this URL to access your API:
+   ```
+   http://<load_balancer_dns>/docs
+   ```
+
+7. **Destroy the infrastructure** (when done):
+   ```bash
+   tofu destroy
+   ```
+
+### Auto-Scaling Features
+
+The infrastructure automatically scales based on:
+- **Minimum instances**: 1 (always at least one web server running)
+- **Maximum instances**: 3 (scales up to three web servers under high load)
+- **Health checks**: Unhealthy instances are automatically replaced
+- **Load balancing**: Traffic is evenly distributed across all healthy instances
 
 ## Database Schema
 
