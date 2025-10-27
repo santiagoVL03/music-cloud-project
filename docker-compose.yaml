@@ -26,25 +26,12 @@ services:
           cpus: "0.25"
           memory: 256M
 
-  db_init:
+  web:
     build: .
     depends_on:
       db:
         condition: service_healthy
-    command: python init_data.py
-    restart: "no"
-    volumes:
-      - .:/app
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql://santiago:santiago@db:5432/musiccloud
-
-  web:
-    build: .
-    depends_on:
-      db_init:
-        condition: service_completed_successfully
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    command: bash -c "python init_data.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - .:/app
     ports:
