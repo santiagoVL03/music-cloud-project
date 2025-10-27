@@ -16,10 +16,20 @@ The main infrastructure configuration file that defines:
 - **Security Groups**:
   - `web_sg`: Allows HTTP (port 80), SSH (port 22), and internal VPC communication for web instances
   - `db_sg`: Allows PostgreSQL (port 5432) from web instances, SSH access, and internal VPC traffic
-- **Database Instance**: Deploys a t3.micro EC2 instance running PostgreSQL 13 in a Docker container with the musiccloud database
-- **Launch Template**: Defines the configuration for web server instances that run the musiccloud-web Docker container, automatically connecting to the database
+- **Database Instance**: Deploys a t3.micro EC2 instance running PostgreSQL 13 in a Docker container with the musiccloud database. Includes **Amazon CloudWatch Agent** for monitoring CPU and memory metrics
+- **Launch Template**: Defines the configuration for web server instances that run the musiccloud-web Docker container, automatically connecting to the database. Also includes **CloudWatch Agent** for detailed monitoring
 - **Application Load Balancer**: Distributes incoming HTTP traffic across multiple web instances
 - **Auto Scaling Group**: Automatically scales web instances between 1 and 3 based on demand, with health checks via the load balancer
+- **Auto Scaling Policies**:
+  - `scale_up`: Adds one instance when CPU > 70% for 2 consecutive periods (300s cooldown)
+  - `scale_down`: Removes one instance when CPU < 30% for 2 consecutive periods (300s cooldown)
+- **CloudWatch Alarms**:
+  - `high_cpu_alarm`: Triggers scale-up when average CPU utilization exceeds 70% over 4 minutes
+  - `low_cpu_alarm`: Triggers scale-down when average CPU utilization falls below 30% over 4 minutes
+- **Monitoring Integration**: CloudWatch Agent collects custom metrics including:
+  - Memory usage percentage (`mem_used_percent`)
+  - CPU usage statistics (`cpu_usage_idle`, `cpu_usage_user`, `cpu_usage_system`)
+  - Metrics collected every 60 seconds for detailed monitoring
 
 #### `opentofu_scaler/variables.tf`
 Defines configurable variables for the infrastructure:
@@ -77,11 +87,41 @@ Exports important information after deployment:
 
 ### Auto-Scaling Features
 
-The infrastructure automatically scales based on:
+The infrastructure automatically scales based on CPU utilization metrics:
+
+#### Scaling Behavior
 - **Minimum instances**: 1 (always at least one web server running)
 - **Maximum instances**: 3 (scales up to three web servers under high load)
-- **Health checks**: Unhealthy instances are automatically replaced
+- **Desired capacity**: 1 (starting point)
+- **Health checks**: Unhealthy instances are automatically replaced via ELB health checks
 - **Load balancing**: Traffic is evenly distributed across all healthy instances
+
+#### Scaling Policies
+- **Scale Up**: 
+  - **Trigger**: Average CPU utilization > 70% for 4 minutes (2 evaluation periods of 120 seconds)
+  - **Action**: Add 1 instance
+  - **Cooldown**: 300 seconds (5 minutes) before another scale-up can occur
+  
+- **Scale Down**: 
+  - **Trigger**: Average CPU utilization < 30% for 4 minutes (2 evaluation periods of 120 seconds)
+  - **Action**: Remove 1 instance
+  - **Cooldown**: 300 seconds (5 minutes) before another scale-down can occur
+
+#### Monitoring with CloudWatch
+All EC2 instances (both database and web servers) are equipped with the **Amazon CloudWatch Agent** that provides:
+
+- **Real-time Metrics**:
+  - CPU usage breakdown (idle, user, system)
+  - Memory utilization percentage
+  - Collected every 60 seconds for granular insights
+
+- **Benefits**:
+  - Better visibility into resource utilization
+  - More accurate scaling decisions based on actual system load
+  - Ability to set up custom alarms for memory-based scaling (if needed)
+  - Historical data for capacity planning
+
+You can view these metrics in the AWS CloudWatch console under the EC2 namespace and custom metrics.
 
 ## Database Schema
 
