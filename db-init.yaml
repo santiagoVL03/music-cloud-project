@@ -9,7 +9,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: db-init
-        image: homura69/musiccloud:latest
+        image: homura69/musiccloud-db_init:latest
         command: ["python", "init_data.py"]
         env:
           - name: PYTHONUNBUFFERED

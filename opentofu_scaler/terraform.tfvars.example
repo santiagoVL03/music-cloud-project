@@ -1,0 +1,27 @@
+# Ejemplo de configuración de variables para el cluster Kubernetes en AWS
+# Copia este archivo a terraform.tfvars y ajusta los valores
+
+# Región de AWS donde se desplegará el cluster
+aws_region = "us-east-1"
+
+# AMI ID para Ubuntu 24.04 LTS (verifica la AMI correcta para tu región)
+# us-east-1: ami-0866a3c8686eaeeba
+# us-west-2: ami-0aff18ec83b712f05
+# eu-west-1: ami-0d71ea30463e0ff8d
+ami_id = "ami-0866a3c8686eaeeba"
+
+# Tipo de instancia para el nodo master (mínimo recomendado: t3.medium)
+master_instance_type = "t3.medium"
+
+# Tipo de instancia para los nodos worker
+worker_instance_type = "t3.small"
+
+# Número de nodos worker
+worker_count = 2
+
+# Tu clave pública SSH (corre: cat ~/.ssh/k8s-cluster-key.pub)
+# Ejemplo: ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDa..."
+ssh_public_key = "AAAAB3NzaC1yc2EAAAADAQABAAACAQCgnEff1JG9oBKK66ErbwIDcs1S4o0XAw8eo7hZFEOxSezhmBOZACnMYn9ms1CVEFhTC5SGvHnPVPq113hujbw6a+q4x55g80tseMjuFpebWNCeo9SO41+ndHVDd/nz1qiTCvHUYeDj2WYHOlWnVwsqnIpr2vDlXb6Mbe0gyzRCoN5q1YZW2+mG6WxlPPCd2bnkbfYz/XcUF0MeImLOmVUPghJ6nQSuGY530yMo1Mwx9SUGiJgLbdGkcFDMdL6wF3+Mj3YZzzR+4QgnlGF4bvMpbVw2WS1a4AHnyrUr8o4HgUxWRgfkLBNfLQRdmHLHYjCXiSfXfnYsCsXsGQtnKl9796MrTX3x/x3ENArNA2WRKlx9q6ReNdG2SOp7xFvrgqIGEhhveC4FNWpN5JM8R4n9x4PzQnhA/ClDZ7i5av1EjOv1VEsAGb0rzXmdrhRA+8hFkVM4vfxl5DXRPmUPyMhlOKobFUrbYKpsQhF7HSbNrDgY+TycikNRYwLv3nv4fb9L0T0gW8JmOu4g4fxpEmkzj+6KKgv9wVTiKiN36rrMxg0osuKwAxAl1BOyq4G3rJr5mrEBWmMVacsuWz8FEW2PLSk76JRuZ49pSGwPmescYryPaImQyXxaegGIF4IdRjD/qQPrwyiQEvb5bE7OBCET6wZ06r3SlxzffIdroSUSwQ=="
+
+# Ruta a tu clave privada SSH
+ssh_private_key_path = "~/.ssh/k8s-cluster-key"
