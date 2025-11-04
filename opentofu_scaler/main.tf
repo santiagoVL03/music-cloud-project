@@ -223,8 +223,6 @@ resource "aws_instance" "k8s_master" {
 
   user_data = templatefile("${path.module}/scripts/master-init.sh", {
     pod_network_cidr = "10.244.0.0/16"
-    s3_bucket        = aws_s3_bucket.k8s_token_bucket.id
-    aws_region       = var.aws_region
   })
 
   tags = {
@@ -255,9 +253,7 @@ resource "aws_instance" "k8s_worker" {
   }
 
   user_data = templatefile("${path.module}/scripts/worker-init.sh", {
-    master_ip  = aws_instance.k8s_master.private_ip
-    s3_bucket  = aws_s3_bucket.k8s_token_bucket.id
-    aws_region = var.aws_region
+    master_ip = aws_instance.k8s_master.private_ip
   })
 
   tags = {
@@ -298,18 +294,13 @@ resource "null_resource" "k8s_setup" {
 
   # Copiar los manifiestos de Kubernetes
   provisioner "file" {
-    source      = "${path.module}/../web.yaml"
-    destination = "/tmp/web.yaml"
-  }
-
-  provisioner "file" {
     source      = "${path.module}/../postgres.yaml"
     destination = "/tmp/postgres.yaml"
   }
 
   provisioner "file" {
-    source      = "${path.module}/../db-init.yaml"
-    destination = "/tmp/db-init.yaml"
+    source      = "${path.module}/../web.yaml"
+    destination = "/tmp/web.yaml"
   }
 
   provisioner "file" {
@@ -322,15 +313,13 @@ resource "null_resource" "k8s_setup" {
     inline = [
       "echo 'Deploying Postgres...'",
       "kubectl apply -f /tmp/postgres.yaml",
-      "sleep 30",
+      "echo 'Waiting for Postgres to be ready...'",
+      "sleep 45",
       
-      "echo 'Deploying Web application...'",
+      "echo 'Deploying Web application (includes init_data.py)...'",
       "kubectl apply -f /tmp/web.yaml",
-      "sleep 20",
-      
-      "echo 'Initializing database...'",
-      "kubectl apply -f /tmp/db-init.yaml",
-      "sleep 10",
+      "echo 'Waiting for web to initialize database...'",
+      "sleep 30",
       
       "echo 'Deploying HPA...'",
       "kubectl apply -f /tmp/hpa.yaml",

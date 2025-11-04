@@ -79,7 +79,7 @@ fi
 
 # 5. Verificar manifiestos de la aplicación
 echo -n "Verificando manifiestos de aplicación... "
-APP_MANIFESTS=("../web.yaml" "../postgres.yaml" "../db-init.yaml")
+APP_MANIFESTS=("../web.yaml" "../postgres.yaml")
 MISSING_APP=0
 
 for manifest in "${APP_MANIFESTS[@]}"; do

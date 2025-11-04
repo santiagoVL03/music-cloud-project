@@ -178,18 +178,87 @@ kubectl top pods
 
 ## 🔍 Debugging
 
-### Ver logs del master
+### Sistema de Logs Mejorado
+
+Cada nodo genera múltiples archivos de log organizados en `/var/log/k8s-setup/`:
+
+**En el Master:**
+- `/var/log/k8s-setup/master-complete.log` - Log completo con toda la salida
+- `/var/log/k8s-setup/master-errors.log` - Solo errores
+- `/var/log/k8s-setup/master-init.log` - Log principal con timestamps
+- `/home/ubuntu/setup-summary.txt` - Resumen de instalación
+
+**En los Workers:**
+- `/var/log/k8s-setup/worker-complete.log` - Log completo con toda la salida
+- `/var/log/k8s-setup/worker-errors.log` - Solo errores
+- `/var/log/k8s-setup/worker-init.log` - Log principal con timestamps
+- `/home/ubuntu/setup-summary.txt` - Resumen de instalación
+
+### Visor de Logs Interactivo
+
+Usa el script `view-logs.sh` para ver los logs fácilmente:
 
 ```bash
+./view-logs.sh
+```
+
+Este script te permite:
+1. Ver logs completos del master
+2. Ver solo errores del master
+3. Ver resumen de instalación del master
+4. Ver logs de workers
+5. Ver solo errores de workers
+6. Ver resumen de workers
+7. **Descargar TODOS los logs localmente**
+8. Ver logs en tiempo real (tail -f)
+
+### Ver logs manualmente del master
+
+```bash
+# Conectarse al master
 ssh -i ~/.ssh/k8s-cluster-key ubuntu@<MASTER_IP>
-sudo tail -f /var/log/k8s-master-init.log
+
+# Ver log completo
+sudo cat /var/log/k8s-setup/master-complete.log
+
+# Ver solo errores
+sudo cat /var/log/k8s-setup/master-errors.log
+
+# Ver log en tiempo real
+sudo tail -f /var/log/k8s-setup/master-complete.log
+
+# Ver resumen
+cat ~/setup-summary.txt
 ```
 
 ### Ver logs de un worker
 
 ```bash
+# Conectarse al worker
 ssh -i ~/.ssh/k8s-cluster-key ubuntu@<WORKER_IP>
-sudo tail -f /var/log/k8s-worker-init.log
+
+# Ver log completo
+sudo cat /var/log/k8s-setup/worker-complete.log
+
+# Ver solo errores
+sudo cat /var/log/k8s-setup/worker-errors.log
+
+# Ver log en tiempo real
+sudo tail -f /var/log/k8s-setup/worker-complete.log
+
+# Ver resumen
+cat ~/setup-summary.txt
+```
+
+### Descargar logs localmente
+
+```bash
+# Usar el script automático
+./view-logs.sh
+# Selecciona opción 7
+
+# O manualmente
+scp -i ~/.ssh/k8s-cluster-key ubuntu@<MASTER_IP>:/var/log/k8s-setup/*.log ./
 ```
 
 ### Ver logs de un pod

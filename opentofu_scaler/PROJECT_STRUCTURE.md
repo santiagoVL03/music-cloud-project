@@ -162,9 +162,7 @@ Copia manifiestos al master
     ↓
 kubectl apply -f postgres.yaml
     ↓
-kubectl apply -f web.yaml
-    ↓
-kubectl apply -f db-init.yaml
+kubectl apply -f web.yaml (incluye init_data.py)
     ↓
 kubectl apply -f hpa.yaml
     ↓

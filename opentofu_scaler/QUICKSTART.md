@@ -53,6 +53,23 @@ kubectl get svc
 http://<MASTER_IP>:30080
 ```
 
+### 📋 Ver Logs de Instalación
+
+Usa el script interactivo para ver logs fácilmente:
+
+```bash
+./view-logs.sh
+```
+
+Opciones disponibles:
+- Ver logs completos del master/workers
+- Ver solo errores
+- Ver resumen de instalación
+- **Descargar todos los logs localmente**
+- Ver logs en tiempo real
+
+**Documentación completa:** Ver `LOGS.md`
+
 ### 📊 Probar Autoscaling
 
 ```bash
