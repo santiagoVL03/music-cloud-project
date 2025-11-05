@@ -11,11 +11,11 @@ COMPLETE_LOG="$LOG_DIR/master-complete.log"
 
 # Función para logging con timestamps
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | sudo tee -a $MASTER_LOG $COMPLETE_LOG
+    log "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | sudo tee -a $MASTER_LOG $COMPLETE_LOG
 }
 
 log_error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" | sudo tee -a $ERROR_LOG $COMPLETE_LOG
+    log "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" | sudo tee -a $ERROR_LOG $COMPLETE_LOG
 }
 
 # Redirigir toda la salida a los archivos de log
@@ -75,7 +75,7 @@ sudo sysctl --system 2>&1 | sudo tee -a $COMPLETE_LOG
 log "✓ Parámetros del kernel configurados"
 
 # 4. Instalar containerd
-echo "[4/10] Instalando containerd..."
+log "[4/10] Instalando containerd..."
 sudo apt-get install -y containerd
 
 # Configurar containerd
@@ -89,11 +89,11 @@ sudo systemctl restart containerd
 sudo systemctl enable containerd
 
 # 5. Instalar kubeadm, kubelet y kubectl
-echo "[5/10] Instalando kubeadm, kubelet y kubectl..."
+log "[5/10] Instalando kubeadm, kubelet y kubectl..."
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+log 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
@@ -109,7 +109,7 @@ fi
 log "✓ Cluster Kubernetes inicializado"
 
 # 7. Configurar kubectl para el usuario ubuntu
-echo "[7/10] Configurando kubectl..."
+log "[7/10] Configurando kubectl..."
 mkdir -p /home/ubuntu/.kube
 sudo cp -i /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
 sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config
@@ -118,27 +118,67 @@ sudo chown ubuntu:ubuntu /home/ubuntu/.kube/config
 mkdir -p /root/.kube
 sudo cp -i /etc/kubernetes/admin.conf /root/.kube/config
 
+# Esperar a que el API server esté completamente listo
+log "Esperando a que el API server esté completamente disponible..."
+RETRIES=0
+MAX_RETRIES=30
+while ! sudo -u ubuntu kubectl get nodes >/dev/null 2>&1; do
+    RETRIES=$((RETRIES+1))
+    if [ $RETRIES -ge $MAX_RETRIES ]; then
+        log_error "CRÍTICO: API server no está disponible después de $MAX_RETRIES intentos"
+        exit 1
+    fi
+    log "Intento $RETRIES/$MAX_RETRIES: API server aún no disponible, esperando..."
+    sleep 10
+done
+log "✓ API server disponible y respondiendo"
+
 # 8. Instalar Flannel CNI
-echo "[8/10] Instalando Flannel CNI..."
-sleep 10
+log "[8/10] Instalando Flannel CNI..."
 sudo -u ubuntu kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
 
 # 9. Instalar Metrics Server
-echo "[9/10] Instalando Metrics Server..."
-sleep 20
-sudo -u ubuntu kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+log "[9/10] Instalando Metrics Server..."
+log "Esperando a que Flannel CNI esté listo antes de instalar Metrics Server..."
+sleep 30  # Dar tiempo a que Flannel CNI se inicialice
+
+# Verificar que podemos comunicarnos con el API server antes de continuar
+log "Verificando disponibilidad del API server..."
+RETRIES=0
+MAX_RETRIES=20
+until sudo -u ubuntu kubectl get nodes >/dev/null 2>&1; do
+    RETRIES=$((RETRIES+1))
+    if [ $RETRIES -ge $MAX_RETRIES ]; then
+        log_error "ADVERTENCIA: API server no responde, intentando de todas formas..."
+        break
+    fi
+    log "API server verificación: intento $RETRIES/$MAX_RETRIES..."
+    sleep 5
+done
+
+log "Aplicando Metrics Server..."
+if ! sudo -u ubuntu kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml 2>&1 | sudo tee -a $COMPLETE_LOG; then
+    log_error "ADVERTENCIA: Falló instalación de Metrics Server (puede necesitar aplicación manual)"
+fi
+
+sleep 10  # Dar tiempo a que Metrics Server se cree antes de patchear
 
 # Patchear metrics-server para que funcione con IPs privadas
-sudo -u ubuntu kubectl patch deployment metrics-server -n kube-system --type='json' -p='[
+log "Aplicando patch a Metrics Server..."
+if ! sudo -u ubuntu kubectl patch deployment metrics-server -n kube-system --type='json' -p='[
   {
     "op": "add",
     "path": "/spec/template/spec/containers/0/args/-",
     "value": "--kubelet-insecure-tls"
   }
-]'
+]' 2>&1 | sudo tee -a $COMPLETE_LOG; then
+    log_error "ADVERTENCIA: Falló patch de Metrics Server (puede necesitar aplicación manual)"
+fi
+
+log "✓ Metrics Server instalado"
 
 # 10. Guardar el comando join para los workers
-echo "[10/10] Generando comando de join para workers..."
+log "[10/10] Generando comando de join para workers..."
 sudo kubeadm token create --print-join-command > /home/ubuntu/join-command.sh
 chmod +x /home/ubuntu/join-command.sh
 
@@ -147,26 +187,30 @@ sudo mkdir -p /var/www/html
 sudo kubeadm token create --print-join-command > /var/www/html/join-command.sh
 sudo chmod 644 /var/www/html/join-command.sh
 
-# Instalar y configurar nginx para servir el archivo
-log "Instalando nginx para servir el comando de join..."
-sudo apt-get install -y nginx 2>&1 | sudo tee -a $COMPLETE_LOG
+# Instalar y configurar Apache para servir el archivo
+log "Instalando Apache2 para servir el comando de join..."
+if ! sudo apt-get install -y apache2 2>&1 | sudo tee -a $COMPLETE_LOG; then
+    log_error "ADVERTENCIA: Falló instalación de Apache2"
+fi
 
-# Configurar nginx para servir en puerto 8080 (evitar conflictos)
-sudo cat > /etc/nginx/sites-available/join-server <<EOF
-server {
-    listen 8080;
-    server_name _;
-    root /var/www/html;
-    location / {
-        autoindex on;
-    }
-}
-EOF
+# Configurar Apache para servir en puerto 8080
+log "Configurando Apache2 en puerto 8080..."
+sudo sed -i 's/^Listen 80$/Listen 8080/' /etc/apache2/ports.conf
+sudo sed -i 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-available/000-default.conf
 
-sudo ln -sf /etc/nginx/sites-available/join-server /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo systemctl restart nginx
-sudo systemctl enable nginx
+# Verificar que los cambios se aplicaron
+log "Verificando configuración de Apache..."
+grep -q "Listen 8080" /etc/apache2/ports.conf && log "✓ Puerto 8080 configurado en ports.conf"
+grep -q "8080" /etc/apache2/sites-available/000-default.conf && log "✓ VirtualHost en puerto 8080 configurado"
+
+# Reiniciar Apache
+if sudo systemctl restart apache2 2>&1 | sudo tee -a $COMPLETE_LOG; then
+    log "✓ Apache2 reiniciado exitosamente"
+else
+    log_error "ADVERTENCIA: Falló reinicio de Apache2"
+fi
+
+sudo systemctl enable apache2 2>&1 | sudo tee -a $COMPLETE_LOG
 
 log "✓ Comando de join disponible via HTTP en http://$(hostname -I | awk '{print $1}'):8080/join-command.sh"
 log "Los workers lo descargarán automáticamente"
@@ -222,7 +266,10 @@ COMANDO PARA VER LOGS:
   sudo cat $ERROR_LOG
 
 COMANDO DE JOIN PARA WORKERS:
-$(cat /tmp/join-command.sh)
+$(cat /var/www/html/join-command.sh 2>/dev/null || cat /home/ubuntu/join-command.sh)
+
+SERVIDOR HTTP:
+  curl http://$(hostname -I | awk '{print $1}'):8080/join-command.sh
 
 ========================================
 EOF

@@ -127,14 +127,16 @@ if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
 fi
 log "✓ Master disponible"
 
-# 7. Esperar adicional para asegurar que kubeadm init haya terminado
-log "[7/9] Esperando que kubeadm init complete en el master..."
-sleep 60
+# 7. Esperar adicional para asegurar que kubeadm init Y Apache2 hayan terminado
+log "[7/9] Esperando que kubeadm init y Apache2 completen en el master..."
+log "Esto puede tomar 5-7 minutos..."
+sleep 180  # 3 minutos adicionales para asegurar que Apache2 esté listo
 log "✓ Tiempo de espera completado"
 
 # 8. Obtener el comando de join del master via HTTP
 log "[8/9] Obteniendo comando de join del master via HTTP..."
 log "Master IP: ${master_ip}"
+log "URL: http://${master_ip}:8080/join-command.sh"
 
 MAX_JOIN_ATTEMPTS=30
 JOIN_ATTEMPT=0

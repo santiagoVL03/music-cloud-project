@@ -132,71 +132,6 @@ resource "aws_security_group" "k8s_sg" {
   }
 }
 
-# --- S3 Bucket para compartir el token de join ---
-resource "aws_s3_bucket" "k8s_token_bucket" {
-  bucket_prefix = "k8s-join-token-"
-  force_destroy = true
-
-  tags = {
-    Name = "k8s-join-token-bucket"
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "k8s_token_bucket_pab" {
-  bucket = aws_s3_bucket.k8s_token_bucket.id
-
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-# --- IAM Role para las instancias EC2 ---
-resource "aws_iam_role" "k8s_node_role" {
-  name = "k8s-node-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "k8s_node_policy" {
-  name = "k8s-node-policy"
-  role = aws_iam_role.k8s_node_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.k8s_token_bucket.arn,
-          "${aws_s3_bucket.k8s_token_bucket.arn}/*"
-        ]
-      }
-    ]
-  })
-}
-
-resource "aws_iam_instance_profile" "k8s_node_profile" {
-  name = "k8s-node-profile"
-  role = aws_iam_role.k8s_node_role.name
-}
-
 # --- Key Pair para acceso SSH ---
 resource "aws_key_pair" "k8s_key" {
   key_name   = "k8s-cluster-key"
@@ -214,7 +149,6 @@ resource "aws_instance" "k8s_master" {
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
   key_name               = aws_key_pair.k8s_key.key_name
-  iam_instance_profile   = aws_iam_instance_profile.k8s_node_profile.name
 
   root_block_device {
     volume_size = 20
@@ -231,8 +165,7 @@ resource "aws_instance" "k8s_master" {
   }
 
   depends_on = [
-    aws_internet_gateway.gw,
-    aws_s3_bucket.k8s_token_bucket
+    aws_internet_gateway.gw
   ]
 }
 
@@ -245,7 +178,6 @@ resource "aws_instance" "k8s_worker" {
   subnet_id              = aws_subnet.public_a.id
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
   key_name               = aws_key_pair.k8s_key.key_name
-  iam_instance_profile   = aws_iam_instance_profile.k8s_node_profile.name
 
   root_block_device {
     volume_size = 20
@@ -263,8 +195,7 @@ resource "aws_instance" "k8s_worker" {
 
   depends_on = [
     aws_instance.k8s_master,
-    aws_internet_gateway.gw,
-    aws_s3_bucket.k8s_token_bucket
+    aws_internet_gateway.gw
   ]
 }
 
@@ -275,6 +206,16 @@ resource "null_resource" "k8s_setup" {
     aws_instance.k8s_worker
   ]
 
+  # Trigger para recrear cuando cambie el master
+  triggers = {
+    master_id = aws_instance.k8s_master.id
+  }
+
+  # Esperar inicial antes de intentar conectar
+  provisioner "local-exec" {
+    command = "echo 'Waiting 60 seconds for master to start initialization...' && sleep 60"
+  }
+
   connection {
     type        = "ssh"
     user        = "ubuntu"
@@ -282,11 +223,20 @@ resource "null_resource" "k8s_setup" {
     host        = aws_instance.k8s_master.public_ip
   }
 
-  # Esperar a que el cluster esté listo
+  # Esperar a que el master-init.sh complete y el cluster esté listo
   provisioner "remote-exec" {
     inline = [
-      "echo 'Waiting for cluster to be ready...'",
-      "timeout 300 bash -c 'until kubectl get nodes 2>/dev/null; do sleep 5; done'",
+      "echo 'Waiting for master initialization to complete...'",
+      "echo 'This may take 5-7 minutes...'",
+      
+      # Esperar a que el archivo de resumen exista (indica que master-init.sh terminó)
+      "timeout 600 bash -c 'until [ -f /home/ubuntu/setup-summary.txt ]; do echo \"Waiting for master-init.sh to complete...\"; sleep 10; done'",
+      "echo 'Master initialization script completed!'",
+      
+      # Esperar a que kubectl funcione
+      "echo 'Waiting for Kubernetes API server...'",
+      "timeout 120 bash -c 'until kubectl get nodes 2>/dev/null; do echo \"Waiting for API server...\"; sleep 5; done'",
+      
       "echo 'Cluster is ready!'",
       "kubectl get nodes"
     ]
