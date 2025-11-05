@@ -132,45 +132,44 @@ log "[7/9] Esperando que kubeadm init complete en el master..."
 sleep 60
 log "✓ Tiempo de espera completado"
 
-# 8. Obtener el comando de join del master via SSH
-log "[8/9] Obteniendo comando de join del master via SSH..."
+# 8. Obtener el comando de join del master via HTTP
+log "[8/9] Obteniendo comando de join del master via HTTP..."
 log "Master IP: ${master_ip}"
-
-# Configurar SSH sin verificación de host (solo para ambientes de desarrollo)
-mkdir -p /home/ubuntu/.ssh
-cat <<EOF > /home/ubuntu/.ssh/config
-Host master
-    HostName ${master_ip}
-    User ubuntu
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
-EOF
-chmod 600 /home/ubuntu/.ssh/config
-chown -R ubuntu:ubuntu /home/ubuntu/.ssh
 
 MAX_JOIN_ATTEMPTS=30
 JOIN_ATTEMPT=0
 
 while [ $JOIN_ATTEMPT -lt $MAX_JOIN_ATTEMPTS ]; do
-    log "Intento $((JOIN_ATTEMPT + 1))/$MAX_JOIN_ATTEMPTS: Obteniendo comando de join via SSH..."
+    log "Intento $((JOIN_ATTEMPT + 1))/$MAX_JOIN_ATTEMPTS: Descargando comando de join via HTTP..."
     
-    # Intentar obtener el comando de join via SSH
-    if sudo -u ubuntu scp -o ConnectTimeout=5 ubuntu@${master_ip}:/tmp/join-command.sh /tmp/join-command.sh 2>&1 | sudo tee -a $COMPLETE_LOG; then
-        log "✓ Comando de join obtenido exitosamente via SSH!"
+    # Intentar descargar el comando de join via HTTP (más simple que SSH)
+    CURL_OUTPUT=$(curl -f -s -o /tmp/join-command.sh http://${master_ip}:8080/join-command.sh 2>&1)
+    CURL_EXIT=$?
+    
+    # Registrar el output si hay alguno
+    if [ -n "$CURL_OUTPUT" ]; then
+        echo "$CURL_OUTPUT" | sudo tee -a $COMPLETE_LOG > /dev/null
+    fi
+    
+    # Verificar si la descarga fue exitosa Y el archivo realmente existe
+    if [ $CURL_EXIT -eq 0 ] && [ -f /tmp/join-command.sh ] && [ -s /tmp/join-command.sh ]; then
+        log "✓ Comando de join descargado exitosamente via HTTP!"
         break
+    else
+        log "Descarga falló (curl exit code: $CURL_EXIT) - archivo no disponible aún"
     fi
     
     JOIN_ATTEMPT=$((JOIN_ATTEMPT + 1))
     if [ $JOIN_ATTEMPT -lt $MAX_JOIN_ATTEMPTS ]; then
-        log "Archivo no disponible aún, esperando 10 segundos..."
+        log "Esperando 10 segundos antes de reintentar..."
         sleep 10
     fi
 done
 
 if [ ! -f /tmp/join-command.sh ]; then
     log_error "CRÍTICO: No se pudo obtener el comando de join después de $MAX_JOIN_ATTEMPTS intentos"
-    log_error "Verifica SSH al master: ssh ubuntu@${master_ip}"
-    log_error "Verifica que el archivo exista en el master: /tmp/join-command.sh"
+    log_error "Verifica que nginx esté corriendo en el master: curl http://${master_ip}:8080/join-command.sh"
+    log_error "Verifica conectividad: ping ${master_ip}"
     log_error "Revisa los logs del master: sudo cat /var/log/k8s-setup/master-complete.log"
     exit 1
 fi

@@ -142,13 +142,35 @@ echo "[10/10] Generando comando de join para workers..."
 sudo kubeadm token create --print-join-command > /home/ubuntu/join-command.sh
 chmod +x /home/ubuntu/join-command.sh
 
-# Guardar también en un archivo accesible via SSH para los workers
-sudo kubeadm token create --print-join-command > /tmp/join-command.sh
-sudo chmod 644 /tmp/join-command.sh
+# Guardar en directorio web para servir via HTTP
+sudo mkdir -p /var/www/html
+sudo kubeadm token create --print-join-command > /var/www/html/join-command.sh
+sudo chmod 644 /var/www/html/join-command.sh
 
-log "✓ Comando de join guardado en /tmp/join-command.sh"
-log "Los workers se conectarán via SSH para obtenerlo"
-log "Comando de join: $(cat /tmp/join-command.sh)"
+# Instalar y configurar nginx para servir el archivo
+log "Instalando nginx para servir el comando de join..."
+sudo apt-get install -y nginx 2>&1 | sudo tee -a $COMPLETE_LOG
+
+# Configurar nginx para servir en puerto 8080 (evitar conflictos)
+sudo cat > /etc/nginx/sites-available/join-server <<EOF
+server {
+    listen 8080;
+    server_name _;
+    root /var/www/html;
+    location / {
+        autoindex on;
+    }
+}
+EOF
+
+sudo ln -sf /etc/nginx/sites-available/join-server /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+
+log "✓ Comando de join disponible via HTTP en http://$(hostname -I | awk '{print $1}'):8080/join-command.sh"
+log "Los workers lo descargarán automáticamente"
+log "Comando de join: $(cat /var/www/html/join-command.sh)"
 
 log "========================================="
 log "Master Node configurado exitosamente!"
